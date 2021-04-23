@@ -1,6 +1,6 @@
 #!/bin/env python3
 
-#This program prints a backtrace of binding evaluations
+# This program prints a backtrace of binding evaluations
 # Usage ./binding-loop-tracker.py applicationName
 # for example ./binding-loop-tracker.py qmlscene someFile.qml
 
@@ -8,9 +8,9 @@ import sys
 import subprocess
 
 
-#to keep everything in one file this has two "mains"
-#a launcher than starts GDB with this as a --command argument
-#and the code that should be run in GDB
+# To keep everything in one file this has two "mains":
+# A launcher that starts GDB with this as a `--command` argument
+# and the code that should be run in GDB
 
 mode = "launcher"
 
@@ -37,21 +37,23 @@ def breakpointHandler(event):
     print("===== Binding loop detected - printing backtrace =====")
 
     i = 0
-    while True:
-        frame = frame.older()
-        if frame == None or not frame.is_valid():
-            break
-
-        #print (frame.name()) # enable to see full trace between binding updates
+    frame = frame.older()
+    while frame is not None and frame.is_valid():
+        #print(frame.name())  # enable to see full trace between binding updates
         if frame.name() == "QQmlBinding::update":
-            currentBinding = frame.read_var("this")
-            eval_string = "(*(QQmlBinding*)("+str(currentBinding)+")).expressionIdentifier()"
-            identifier = convertQString(gdb.parse_and_eval(eval_string))
+            currentBinding = str(frame.read_var("this"))
+            try:
+                eval_string = "static_cast<QQmlBinding*>({})->expressionIdentifier()".format(
+                    currentBinding)
+                identifier = convertQString(gdb.parse_and_eval(eval_string))
+            except gdb.error:
+                identifier = "<optimized out>"
 
             print("#" + str(i) + " - " + identifier)
             i += 1
+        frame = frame.older()
 
-    print()
+    print('---')
     gdb.execute("continue")
 
 
